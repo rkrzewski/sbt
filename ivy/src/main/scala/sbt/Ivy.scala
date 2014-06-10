@@ -4,6 +4,7 @@
 package sbt
 
 import Resolver.PluginPattern
+import ivyint.ConsolidatedResolveEngine
 
 import java.io.File
 import java.net.URI
@@ -14,12 +15,14 @@ import CS.singleton
 import org.apache.ivy.Ivy
 import org.apache.ivy.core.{ IvyPatternHelper, LogOptions }
 import org.apache.ivy.core.cache.{ CacheMetadataOptions, DefaultRepositoryCacheManager, ModuleDescriptorWriter }
+import org.apache.ivy.core.event.EventManager
 import org.apache.ivy.core.module.descriptor.{ Artifact => IArtifact, DefaultArtifact, DefaultDependencyArtifactDescriptor, MDArtifact }
 import org.apache.ivy.core.module.descriptor.{ DefaultDependencyDescriptor, DefaultModuleDescriptor, DependencyDescriptor, ModuleDescriptor, License }
 import org.apache.ivy.core.module.descriptor.{ OverrideDependencyDescriptorMediator }
 import org.apache.ivy.core.module.id.{ ArtifactId, ModuleId, ModuleRevisionId }
-import org.apache.ivy.core.resolve.{ IvyNode, ResolveData, ResolvedModuleRevision }
+import org.apache.ivy.core.resolve.{ IvyNode, ResolveData, ResolvedModuleRevision, ResolveEngine }
 import org.apache.ivy.core.settings.IvySettings
+import org.apache.ivy.core.sort.SortEngine
 import org.apache.ivy.plugins.latest.LatestRevisionStrategy
 import org.apache.ivy.plugins.matcher.PatternMatcher
 import org.apache.ivy.plugins.parser.m2.PomModuleDescriptorParser
@@ -76,7 +79,17 @@ final class IvySbt(val configuration: IvyConfiguration) {
     }
   private lazy val ivy: Ivy =
     {
-      val i = new Ivy() { private val loggerEngine = new SbtMessageLoggerEngine; override def getLoggerEngine = loggerEngine }
+      val i = new Ivy() {
+        private val loggerEngine = new SbtMessageLoggerEngine
+        override def getLoggerEngine = loggerEngine
+        override def bind(): Unit = {
+          // We inject the deps we need before we can hook our resolve engine.
+          setSortEngine(new SortEngine(getSettings))
+          setEventManager(new EventManager())
+          setResolveEngine(new ResolveEngine(getSettings, getEventManager, getSortEngine) with ConsolidatedResolveEngine)
+          super.bind()
+        }
+      }
       i.setSettings(settings)
       i.bind()
       i.getLoggerEngine.pushLogger(new IvyLoggerInterface(configuration.log))
