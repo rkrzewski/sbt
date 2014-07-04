@@ -1,5 +1,7 @@
 import sbt._
 import Keys._
+import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys
+import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseCreateSrc
 
 object Transform {
   lazy val transformSources = TaskKey[Seq[File]]("transform-sources")
@@ -53,7 +55,8 @@ object Transform {
     transformSources <<= (fileMappings in transformSources, sourceProperties) map { (rs, props) =>
       rs map { case (in, out) => transform(in, out, props) }
     },
-    sourceGenerators <+= transformSources
+    sourceGenerators <+= transformSources,
+    EclipseKeys.createSrc in Compile := EclipseCreateSrc.Default + EclipseCreateSrc.Managed
   )
   def transformSourceMappings = (inputSources, inputSourceDirectories, sourceManaged) map { (ss, sdirs, sm) =>
     (ss --- sdirs) x (rebase(sdirs, sm) | flat(sm)) toSeq

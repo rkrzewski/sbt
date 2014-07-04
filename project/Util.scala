@@ -1,6 +1,8 @@
 import sbt._
 import Keys._
 import StringUtilities.normalize
+import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys
+import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseCreateSrc
 
 object Util {
   val ExclusiveTest = Tags.Tag("exclusive-test")
@@ -167,7 +169,8 @@ object %s {
   def keywordsSettings: Seq[Setting[_]] = inConfig(Compile)(Seq(
     scalaKeywords := getScalaKeywords,
     generateKeywords <<= (sourceManaged, scalaKeywords) map writeScalaKeywords,
-    sourceGenerators <+= generateKeywords map (x => Seq(x))
+    sourceGenerators <+= generateKeywords map (x => Seq(x)),
+    EclipseKeys.createSrc in Compile := EclipseCreateSrc.Default + EclipseCreateSrc.Managed
   ))
 }
 object Common {

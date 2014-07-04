@@ -8,13 +8,15 @@ import Common._
 import Licensed._
 import Scope.ThisScope
 import LaunchProguard.{ proguard, Proguard }
+import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys
+import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseCreateSrc
 
 object Sbt extends Build {
   override lazy val settings = super.settings ++ buildSettings ++ Status.settings ++ nightlySettings
 
   // Aggregate task for 2.11
   private def lameAgregateTask(task: String): String =
-        s"all control/$task collections/$task io/$task completion/$task"
+    s"all control/$task collections/$task io/$task completion/$task"
   def buildSettings = Seq(
     organization := "org.scala-sbt",
     version := "0.13.6-SNAPSHOT",
@@ -28,6 +30,11 @@ object Sbt extends Build {
     testOptions += Tests.Argument(TestFrameworks.ScalaCheck, "-w", "1"),
     javacOptions in compile ++= Seq("-target", "6", "-source", "6", "-Xlint", "-Xlint:-serial"),
     incOptions := incOptions.value.withNameHashing(true),
+    // do not add test source files to generated `.classpath` file
+    // we have to exclude test files because Eclipse has only one classpath per project
+    // which makes it fail to resolve class definitions correctly because classes defined
+    // in tests overshadow classes defined in dependent projects
+    EclipseKeys.createSrc in Test := EclipseCreateSrc.ValueSet.empty,
     commands += Command.command("setupBuildScala211") { state =>
       """set scalaVersion in ThisBuild := "2.11.1" """ ::
         "set Util.includeTestDependencies in ThisBuild := true" ::
@@ -57,15 +64,15 @@ object Sbt extends Build {
     },
     commands += Command.command("release-sbt-local") { state =>
       "publishLocal" ::
-      "setupBuildScala211" ::
-      lameAgregateTask("publishLocal") ::
-      "reload" ::
-      state
+        "setupBuildScala211" ::
+        lameAgregateTask("publishLocal") ::
+        "reload" ::
+        state
     },
     commands += Command.command("release-sbt") { state =>
       // TODO - Any sort of validation
       "checkCredentials" ::
-      "publishSigned" ::
+        "publishSigned" ::
         "publishLauncher" ::
         "release-libs-211" ::
         state
@@ -325,7 +332,8 @@ object Sbt extends Build {
     watchSources <++= apiDefinitions,
     resourceGenerators in Compile <+= (version, resourceManaged, streams, compile in Compile) map generateVersionFile,
     apiDefinitions <<= baseDirectory map { base => (base / "definition") :: (base / "other") :: (base / "type") :: Nil },
-    sourceGenerators in Compile <+= (cacheDirectory, apiDefinitions, fullClasspath in Compile in datatypeSub, sourceManaged in Compile, mainClass in datatypeSub in Compile, runner, streams) map generateAPICached
+    sourceGenerators in Compile <+= (cacheDirectory, apiDefinitions, fullClasspath in Compile in datatypeSub, sourceManaged in Compile, mainClass in datatypeSub in Compile, runner, streams) map generateAPICached,
+    EclipseKeys.createSrc in Compile := EclipseCreateSrc.Default + EclipseCreateSrc.Managed
   )
 
   def precompiledSettings = Seq(
